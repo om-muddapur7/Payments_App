@@ -4,6 +4,7 @@ const { User } = require("../db");
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcrypt");
 const JWT_SECRET = require("../config");
+const { authMiddleware } = require("../middleware");
 
 const router = express.Router();
 
@@ -77,7 +78,7 @@ router.post("/signin", async (req, res) => {
     const password = data.password;
 
     const user = User.findOne({
-        username: body.username
+        username: username
     })
 
     if(!user._id){
@@ -103,6 +104,59 @@ router.post("/signin", async (req, res) => {
         token: token
     })
 
+})
+
+const updateSchema = zod.object({
+    password: zod.string().min(6).optional(),
+    firstName: zod.string().optional(),
+    lastName: zod.string().optional()
+})
+
+//update password, firtname, lastname
+router.put("/", authMiddleware, async (req, res) => {
+    const body = req.body;
+    const {success} = updateSchema.safeParse(body);
+
+    if(!success){
+        return res.status(411).json({
+            message: "Incorrect inputs"
+        })
+    }
+
+    await User.updateOne(body, {
+        id: req.userId
+    })
+
+    res.json({
+        message: "Updated successfully"
+    })
+
+})
+
+//get other users
+router.get("/bulk", async(req, res) => {
+    const filter = req.query.filter || "";
+
+    const users = await User.find({
+        $or: [{
+            firstName: {
+                "$regex": filter
+            }
+        }, {
+            lastName: {
+                "$regex": filter
+            }
+        }]
+    })
+
+    res.json({
+        user: users.map(user => ({
+            username: user.username,
+            firstName: user.firstName,
+            lastName: user.lastName,
+            _id: user._id
+        }))
+    })
 })
 
 module.exports = router;
