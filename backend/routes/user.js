@@ -10,7 +10,7 @@ const router = express.Router();
 
 
 const signupSchema = zod.object({
-    username: zod.email(),
+    username: zod.string().email(),
     password: zod.string().min(6),
     firstName: zod.string(),
     lastName: zod.string()
@@ -32,11 +32,11 @@ router.post("/signup", async (req, res) => {
     const firstName = data.firstName;
     const lastName = data.lastName;
 
-    const user = User.findOne({
+    const user = await User.findOne({
         username: username
     })
 
-    if(user._id){
+    if(user){
         return res.json({
             message: "Email already taken / Incorrect inputs"
         })
@@ -51,7 +51,7 @@ router.post("/signup", async (req, res) => {
         lastName: lastName
     });
 
-    const userId = user._id;
+    const userId = dbUser._id;
 
     await Account.create({
         userId,
@@ -66,7 +66,7 @@ router.post("/signup", async (req, res) => {
 
 
 const signinSchema = zod.object({
-    username: zod.email(),
+    username: zod.string().email(),
     password: zod.string().min(6)
 })
 
@@ -84,11 +84,11 @@ router.post("/signin", async (req, res) => {
     const username = data.username;
     const password = data.password;
 
-    const user = User.findOne({
+    const user = await User.findOne({
         username: username
     })
 
-    if(!user._id){
+    if(!user){
         return res.json({
             message: "Incorrect inputs"
         })
@@ -103,7 +103,7 @@ router.post("/signin", async (req, res) => {
         }
 
     const token = jwt.sign({
-        userId: dbUser._id
+        userId: user._id
     }, JWT_SECRET);
 
     res.json({
@@ -120,7 +120,7 @@ const updateSchema = zod.object({
 })
 
 //update password, firtname, lastname
-router.put("/", authMiddleware, async (req, res) => {
+router.put("/update", authMiddleware, async (req, res) => {
     const body = req.body;
     const {success} = updateSchema.safeParse(body);
 
@@ -130,14 +130,18 @@ router.put("/", authMiddleware, async (req, res) => {
         })
     }
 
-    await User.updateOne(body, {
-        id: req.userId
-    })
+    const updatedUser = await User.updateOne(
+        {
+            _id: req.userId
+        },
+        {
+            $set: body
+        }
+    );
 
     res.json({
         message: "Updated successfully"
     })
-
 })
 
 //get other users
